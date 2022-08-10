@@ -5,25 +5,25 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.0.1"
 
 public Plugin myinfo =
 {
-  name = "BhopM",
-  author = "ugng, ReFlexPoison",
+  name = "Bhop: 3D Recreation",
+  author = "ugng",
   description = "Bunnyhop with modified behavior",
   version = PLUGIN_VERSION,
   url = "https://osyu.sh/"
 }
 
-ConVar g_hBhopEnabled;
+Handle g_hBhopEnabled;
 bool g_bHopping[MAXPLAYERS + 1];
 float g_fPrevZVel[MAXPLAYERS + 1];
 bool g_bPrevOnGround[MAXPLAYERS + 1];
 
 public void OnPluginStart()
 {
-  CreateConVar("bhopm_version", PLUGIN_VERSION, "BhopM version", FCVAR_NOTIFY|FCVAR_DONTRECORD);
+  CreateConVar("bhopm_version", PLUGIN_VERSION, "Bhop version", FCVAR_NOTIFY | FCVAR_DONTRECORD);
 
   g_hBhopEnabled = CreateConVar("sm_bhop_enable", "1", "Enable/disable bhop globally", _, true, 0.0, true, 1.0);
 
@@ -36,45 +36,41 @@ public void OnPluginStart()
   }
 
   LoadTranslations("common.phrases");
-  RegConsoleCmd("sm_bhop", BhopToggle, "Toggle bhop");
+  RegConsoleCmd("sm_bhop", BhopToggle, "Toggle bhop for yourself");
 }
 
-public void OnClientPutInServer(int client)
+public void OnClientPutInServer(int iClient)
 {
-  g_bHopping[client] = true;
-  SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage);
+  g_bHopping[iClient] = true;
+  SDKHook(iClient, SDKHook_OnTakeDamage, OnTakeDamage);
 }
 
-public Action OnPlayerRunCmd(int client, int& buttons)
+public Action OnPlayerRunCmd(int iClient, int& iButtons)
 {
-  if (!(g_hBhopEnabled.BoolValue && g_bHopping[client]))
+  if (IsPlayerAlive(iClient) && GetConVarBool(g_hBhopEnabled) && g_bHopping[iClient])
   {
-    return Plugin_Continue;
-  }
+    static int iFlags;
+    static float vVel[3];
+    iFlags = GetEntityFlags(iClient);
+    GetEntPropVector(iClient, Prop_Data, "m_vecVelocity", vVel);
 
-  if (IsPlayerAlive(client))
-  {
-    static int flags;
-    static float vel[3];
-    flags = GetEntityFlags(client);
-    GetEntPropVector(client, Prop_Data, "m_vecVelocity", vel);
-
-    if ((flags & FL_ONGROUND) && !g_bPrevOnGround[client] && (buttons & IN_JUMP))
+    if ((iFlags & FL_ONGROUND) && !g_bPrevOnGround[iClient] && (iButtons & IN_JUMP))
     {
-      vel[2] = (flags & FL_DUCKING) ? (-g_fPrevZVel[client] > 267.0 ? -g_fPrevZVel[client] : 267.0) : 267.0;
-      TeleportEntity(client, NULL_VECTOR, NULL_VECTOR, vel);
+      vVel[2] = (iFlags & FL_DUCKING) ? (-g_fPrevZVel[iClient] > 267.0 ? -g_fPrevZVel[iClient] : 267.0) : 267.0;
+      TeleportEntity(iClient, NULL_VECTOR, NULL_VECTOR, vVel);
     }
     
-    g_fPrevZVel[client] = vel[2];
-    g_bPrevOnGround[client] = flags & FL_ONGROUND != 0;
+    g_fPrevZVel[iClient] = vVel[2];
+    g_bPrevOnGround[iClient] = view_as<bool>(iFlags & FL_ONGROUND);
   }
 
   return Plugin_Continue;
 }
 
-public Action OnTakeDamage(int victim, int& attacker, int& inflictor, float& damage, int& type)
+Action OnTakeDamage(int iVictim, int& iAttacker, int& iInflictor, float& fDamage, int& iType)
 {
-  if (type == DMG_FALL && g_hBhopEnabled.BoolValue && g_bHopping[victim] && (GetClientButtons(victim) & IN_JUMP) && (GetEntityFlags(victim) & FL_DUCKING))
+  if (iType == DMG_FALL && GetConVarBool(g_hBhopEnabled) && g_bHopping[iVictim] &&
+    (GetClientButtons(iVictim) & IN_JUMP) && (GetEntityFlags(iVictim) & FL_DUCKING))
   {
     return Plugin_Handled;
   }
@@ -82,20 +78,20 @@ public Action OnTakeDamage(int victim, int& attacker, int& inflictor, float& dam
   return Plugin_Continue;
 }
 
-public Action BhopToggle(int client, int args)
+Action BhopToggle(int iClient, int iArgs)
 {
-  if (client == 0)
+  if (iClient == 0)
   {
-    ReplyToCommand(client, "[SM] %t", "Command is in-game only");
+    ReplyToCommand(iClient, "[SM] %t", "Command is in-game only");
     return Plugin_Handled;
   }
-  if (!(g_hBhopEnabled.BoolValue))
+  else if (!GetConVarBool(g_hBhopEnabled))
   {
-    ReplyToCommand(client, "[SM] Cannot toggle bhop because it's disabled globally.");
+    ReplyToCommand(iClient, "[SM] Cannot toggle bhop because it's disabled globally.");
     return Plugin_Handled;
   }
 
-  g_bHopping[client] = !g_bHopping[client];
-  ReplyToCommand(client, "[SM] Bhop %s.", g_bHopping[client] ? "enabled" : "disabled");
+  g_bHopping[iClient] = !g_bHopping[iClient];
+  ReplyToCommand(iClient, "[SM] Bhop %s.", g_bHopping[iClient] ? "enabled" : "disabled");
   return Plugin_Handled;
 }

@@ -1,4 +1,4 @@
-# BhopM
+# Bhop: 3D Recreation
 
 Bunnyhop plugin derived from ReFlexPoison's [Simple Bunny Hop](https://forums.alliedmods.net/showthread.php?t=209853), with special behavior.
 
